@@ -5,6 +5,31 @@ local tar = loadfile("luaTar.lua")
 if type(tar) ~= "function" then print("luaTar.lua is not exist! this GameGuardian wrapper depends on it.") return end
 tar = tar()
 
+-- Helper function
+function table.tostring(t,dp)
+	dp = dp or 0
+	local r,tab,tv = '{\n',('\t'):rep(dp)
+	local tabb = tab..'\t'
+	for k,v in pairs(t) do
+		r = r..tabb
+		tv = type(v)
+		if type(k) == 'string' then
+			r = r..k..' = '
+		end
+		if tv == 'table' then
+			r = r..table.tostring(v,dp+1)
+		elseif tv == 'boolean' or tv == 'number' then
+			r = r..tostring(v)
+		elseif tv == 'function' then
+			r = r.."funcion()end"
+		else
+			r = r..'"'..v..'"'
+		end
+		r = r..',\n'
+	end
+	return r..tab..'}'
+end
+
 -- Tests (also acts as an example as well :/)
 function runTests()
 	local fileName = "Test.tar"
@@ -14,6 +39,9 @@ function runTests()
 	tar.add(fileName,"a.txt","This is text Alpha.")
 	tar.add(fileName,"b.txt","This is text Bravo.")
 	tar.add(fileName,"c.txt","This is text Charlie.")
+
+	print("\nTar — Parse header")
+	print(table.tostring(tar.parseHeader(fileName)))
 
 	print("\nTar — Remove Charlie")
 	tar.remove(fileName,"c.txt")
@@ -30,9 +58,6 @@ function runTests()
 	print(1,tar.extract(fileName,"a.txt"))
 	print(2,tar.extract(fileName,"b.txt"))
 	print(3,tar.extract(fileName,"c.txt") or "<removed>")
-
-	print("\nTar — Check Header Integrity")
-	print(tar.checkHeader(fileName))
 
 	print("\nTar — End of Test.")
 	os.remove(fileName)
@@ -58,6 +83,7 @@ while true do
 		"3. Remove",
 		"4. List files",
 		"5. Check header integrity",
+		"6. Parse Tar header",
 		"Run tests & Exit",
 		"Exit",
 	},nil,"ABJ4403's Lua Tape Archive")
@@ -164,9 +190,21 @@ while true do
 			break
 		end
 	elseif CH == 6 then
+		CH = gg.prompt({
+			"Name of Tar archive",
+		},{
+			opts.tarPath..'/'..opts.tarName,
+		},{
+			"file",
+		})
+		if CH and CH[1] then
+			print(table.tostring(tar.parseHeader(CH[1])))
+			break
+		end
+	elseif CH == 7 then
 		runTests()
 		break
-	elseif CH == 7 then
+	elseif CH == 8 then
 		break
 	end
 end

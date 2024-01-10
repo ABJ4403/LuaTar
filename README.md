@@ -32,7 +32,8 @@ Because i want this to be dead simple, there will be some features missing:
 - Last modified date will always be 01/01/1970_00:00:00 (Unix epoch time set to 0).
 - File owner:group will always be 0:0 (root:root).
 - File permission will always be 777 (owner/group/everyone will get read/write/execute permission)
-- Can't add folder, or modify Tar with folder in it (might be a big bummer of this script).
+- Can't extract or add folder (because Lua limitation)
+- Can't modify, remove folder (logic not implemented yet cuz its too complex).
 - There will be no UnixStandardTAR header, which means that you might unable to use too long names (more than ~150ish characters)
 
 # License

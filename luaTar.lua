@@ -7,23 +7,24 @@
 
 ]]
 local tar = {
-  VERSION = 2
+  VERSION = 3
 }
 function tar.add(tarPath,fileName,content)
 	local tarFile,err = io.open(tarPath,"ab")
 	if not tarFile then return err or false end
+	-- note: %07o = octal
 	local header =
-		fileName..("\0"):rep(100 - #fileName)..	 -- File name
-		'0000666\0'..										 -- File mode (octal)
-		("%07o"):format(0)..'\0'..			 -- Uid (octal)
-		("%07o"):format(0)..'\0'..			 -- Gid (octal)
-		("%011o"):format(#content)..'\0'..-- File size (octal)
-		("%011o"):format(0)..'\0'..			 -- Last modification time (octal)
-		("\0"):rep(7)..' '..						 -- Checksum (octal)
-		"0"..									 					 -- Type flag (0: file,1: hardlink,2: symlink)
-		("\0"):rep(100)..								 -- name of linked file (we dont want those symlinks and stuf so aint using one
-		("\0"):rep(88)..								 -- UnixStandardTar header (6b) + version (2b), user + group (64b), device major + minor number (16b)
-		("\0"):rep(167)					 				 -- UStar Filename prefix
+		fileName..("\0"):rep(100 - #fileName)..	-- Name
+		'0000666\0'..														-- Mode
+		("%07o"):format(0)..'\0'..							-- UID
+		("%07o"):format(0)..'\0'..							-- GID
+		("%011o"):format(#content)..'\0'..			-- Size
+		("%011o"):format(0)..'\0'..							-- Last modified
+		("\0"):rep(7)..' '..										-- Checksum
+		"0"..													 					-- Type (0/1/2:file/hardlink/symlink)
+		("\0"):rep(100)..												-- linked file name (we dont want those symlinks and stuf so aint using one
+		("\0"):rep(88)..												-- UnixStandardTar header (6b) + version (2b), user + group (64b), device major + minor number (16b)
+		("\0"):rep(167)					 								-- UStar Filename prefix
 	-- Checksum
 	local sum = 224
 	for i=1,512 do
@@ -49,19 +50,21 @@ function tar.extract(tarPath,fileName)
 		if not block then break end
 		local fileSize = tonumber(block:sub(125,135),8) -- get the file size
 if not fileSize then print("FILE SIZE CONVERSION BUG DETECTED",block:sub(125,135),1)break end
+    -- skip to next block where another file header is located
 		if block:sub(1,math.min(100,#fileName)) == fileName then -- if a block starts with filename
 			local data = file:read(fileSize) -- read the whole thing
 			file:close()
 			return data
 		end
-    local blocksToSkip = math.ceil(fileSize / 512) + 1 -- GameGuardian io bug -- skip to next block where another file header is located
-    file:seek("cur",blocksToSkip * 512)
+    local skipBlk = math.ceil((fileSize-.00000000000000001) / 512) -- extra zeroes to fix Lua floating point integer bug
+    file:seek("cur",skipBlk * 512)
 	end
 	file:close()
 end
 function tar.remove(tarPath,fileName)
   local file = io.open(tarPath,"rb")
   if not file then return end
+  local removedFiles = 0
   local output = io.open(tarPath..".tmp","wb")
   while true do
     local block = file:read(512)
@@ -69,8 +72,9 @@ function tar.remove(tarPath,fileName)
     if block:sub(1,math.min(100,#fileName)) == fileName then -- ignores the block with the file that is going to be removed
       local fileSize = tonumber(block:sub(125,135),8)
 if not fileSize then print("FILE SIZE CONVERSION BUG DETECTED",block:sub(125,135),1)break end
-      local blocksToSkip = math.ceil(fileSize / 512) + 1 -- GameGuardian io bug + 1
-      file:seek("cur",blocksToSkip * 512)
+      local skipBlk = math.ceil((fileSize-.00000000000000001) / 512) -- extra zeroes to fix Lua floating point integer bug
+      file:seek("cur",skipBlk * 512)
+      removedFiles = removedFiles + 1
     else
       output:write(block) -- write the rest of the block to temporary file
     end
@@ -79,6 +83,7 @@ if not fileSize then print("FILE SIZE CONVERSION BUG DETECTED",block:sub(125,135
   output:close()
   os.remove(tarPath)
   os.rename(tarPath..".tmp",tarPath)
+  return removedFiles
 end
 function tar.parseHeader(tarPath)
 	local ret = {}
@@ -102,7 +107,7 @@ function tar.parseHeader(tarPath)
 	--result
 		local header = {
 			isValid = checksumValid,
-			headerBytes = block,
+			--headerBytes = block,
 			mode = block:sub(101,107),
 			uid = tonumber(block:sub(109,115),8),
 			gid = tonumber(block:sub(117,123),8),
@@ -112,7 +117,7 @@ function tar.parseHeader(tarPath)
 			["type"] = tonumber(block:sub(156,156)),
 			linkedName = block:sub(157,257),
 			ustar = {
-				headerBytes = block:sub(158,501),
+				--headerBytes = block:sub(158,501),
 				ustarHeader = block:sub(258,263),
 				version = block:sub(264,265),
 				user = block:sub(266,297),
@@ -126,43 +131,33 @@ function tar.parseHeader(tarPath)
 	--seek block
 if not header.size then print("FILE SIZE BUG DETECTED! CANNOT CONTINUE!!")break end
     local skipBlk =
-    	math.ceil(header.size / 512) + 1 -- GameGuardian io bug
+    	math.ceil((header.size-.00000000000000001) / 512) -- extra zeroes to fix Lua floating point integer bug
     file:seek("cur",skipBlk * 512)
 	end
 	file:close()
 	return ret
 end
 function tar.query(tarPath)
-	local file = io.open(tarPath,"rb")
-	if not file then return end
 	local fileList = {}
-	while true do
-		local block = file:read(512)
-		if not block then break end
-		local fileName = block:sub(1,100):gsub("\0+$","")
-		table.insert(fileList,fileName)
-		local fileSize = tonumber(block:sub(125,135),8)
-if not fileSize then print("FILE SIZE CONVERSION BUG DETECTED",block:sub(125,135),1)break end
-    local blocksToSkip = math.ceil(fileSize / 512) + 1 -- GameGuardian io bug
-    file:seek("cur",blocksToSkip * 512)
+	for k in pairs(tar.parseHeader(tarPath)) do
+		table.insert(fileList,k)
 	end
-	file:close()
 	return fileList
 end
 function tar.queryFile(tarPath)
 	local fileList = {}
-	for k,v in ipairs(tar.query(tarPath)) do
-		if v:sub(#v,#v) ~= "/" then
-			fileList[k] = v
+	for k in pairs(tar.parseHeader(tarPath)) do
+		if k:sub(#k,#k) ~= "/" then
+			table.insert(fileList,k)
 		end
 	end
 	return fileList
 end
 function tar.queryFolder(tarPath)
 	local fileList = {}
-	for k,v in ipairs(tar.query(tarPath)) do
-		if v:sub(#v,#v) == "/" then
-			fileList[k] = v
+	for k in pairs(tar.parseHeader(tarPath)) do
+		if k:sub(#k,#k) == "/" then
+			table.insert(fileList,k)
 		end
 	end
 	return fileList

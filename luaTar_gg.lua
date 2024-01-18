@@ -1,8 +1,8 @@
 -- This is the GameGuardian UI wrapper for luaTar
 -- make sure you have the luaTar.lua script as well :D
 
-local tar = loadfile("luaTar.lua")
-if type(tar) ~= "function" then print("luaTar.lua is not exist! this GameGuardian wrapper depends on it.") return end
+local tar,err = loadfile("luaTar.lua")
+if type(tar) ~= "function" or err then print("luaTar.lua is not exist or unable to be loaded! this GameGuardian wrapper depends on it. Details: ",err) return end
 tar = tar()
 
 -- Helper function
@@ -82,8 +82,7 @@ while true do
 		"2. Extract",
 		"3. Remove",
 		"4. List files",
-		"5. Check header integrity",
-		"6. Parse Tar header",
+		"5. Parse Tar header",
 		"Run tests & Exit",
 		"Exit",
 	},nil,"ABJ4403's Lua Tape Archive")
@@ -186,25 +185,13 @@ while true do
 			"file",
 		})
 		if CH and CH[1] then
-			print(tar.checkHeader(CH[1]))
-			break
-		end
-	elseif CH == 6 then
-		CH = gg.prompt({
-			"Name of Tar archive",
-		},{
-			opts.tarPath..'/'..opts.tarName,
-		},{
-			"file",
-		})
-		if CH and CH[1] then
 			print(table.tostring(tar.parseHeader(CH[1])))
 			break
 		end
-	elseif CH == 7 then
+	elseif CH == 6 then
 		runTests()
 		break
-	elseif CH == 8 then
+	elseif CH == 7 then
 		break
 	end
 end

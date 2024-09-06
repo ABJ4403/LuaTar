@@ -35,16 +35,21 @@ function runTests()
 	local fileName = "Test.tar"
 	os.remove(fileName)
 
-	print("\nTar — Add 3 File")
+	print("\nTar — Add Files")
+	print("- a.txt")
 	tar.add(fileName,"a.txt","This is text Alpha.")
+	print("- b.txt")
 	tar.add(fileName,"b.txt","This is text Bravo.")
-	tar.add(fileName,"c.txt","This is text Charlie.")
+	print("- folder/")
+	tar.add(fileName,"folder/")
+	print("- folder/c.txt")
+	tar.add(fileName,"folder/c.txt","This is text Charlie.")
 
 	print("\nTar — Parse header")
 	print(table.tostring(tar.parseHeader(fileName)))
 
-	print("\nTar — Remove Charlie")
-	tar.remove(fileName,"c.txt")
+	print("\nTar — Remove Bravo")
+	tar.remove(fileName,"b.txt")
 
 	print("\nTar — Query File")
 	local fileList = tar.queryFile(fileName)
@@ -56,8 +61,8 @@ function runTests()
 
 	print("\nTar — Extract")
 	print(1,tar.extract(fileName,"a.txt"))
-	print(2,tar.extract(fileName,"b.txt"))
-	print(3,tar.extract(fileName,"c.txt") or "<removed>")
+	print(2,tar.extract(fileName,"b.txt") or "<removed>")
+	print(3,tar.extract(fileName,"folder/c.txt"))
 
 	print("\nTar — End of Test.")
 	os.remove(fileName)
@@ -79,10 +84,11 @@ local opts = {
 while true do
 	local CH = gg.choice({
 		"1. Add",
-		"2. Extract",
-		"3. Remove",
-		"4. List files",
-		"5. Parse Tar header",
+		"2. Add Folder",
+		"3. Extract",
+		"4. Remove",
+		"5. List files",
+		"6. Parse Tar header",
 		"Run tests & Exit",
 		"Exit",
 	},nil,"ABJ4403's Lua Tape Archive")
@@ -115,29 +121,25 @@ while true do
 		end
 	elseif CH == 2 then
 		CH = gg.prompt({
+			"Output of the Tar archive",
 			"Name of Tar archive",
+			"Folder name",
 		},{
-			opts.tarPath..'/'..opts.tarName,
+			opts.tarPath,
+			opts.tarName,
+			"New Folder"
 		},{
-			"file",
+			"path",
+			"text",
+			"text",
 		})
-		if CH and CH[1] then
-			opts.tarFile = CH[1]
-			local fileList = tar.query(CH[1])
-			if fileList[1] then
-				local CH = gg.multiChoice(fileList,nil,"Select files to be extracted")
-				if CH then
-					for i=1,#fileList do
-						if CH[i] then
-							io.open(opts.tarPath..'/'..fileList[i],"wb"):write(
-								tar.extract(opts.tarFile,fileList[i])
-							):close()
-						end
-					end
-				end
-			else
-				gg.toast("Unknown error")
-			end
+		if CH and CH[1] and CH[2] and CH[3] then
+			opts.tarPath = CH[1]
+			opts.tarName = CH[2]:gsub("%.tar$","")..".tar"
+			opts.tarFile = opts.tarPath..'/'..opts.tarName
+			opts.folderName = CH[3].."/"
+			if tar.add(opts.tarFile,opts.folderName) then gg.toast("Archive created!")
+			else gg.toast("Cant create archive path, is the path correct?") end
 		end
 	elseif CH == 3 then
 		CH = gg.prompt({
@@ -149,13 +151,15 @@ while true do
 		})
 		if CH and CH[1] then
 			opts.tarFile = CH[1]
-			local fileList = tar.query(CH[1])
+			local fileList = tar.queryFile(CH[1])
 			if fileList[1] then
-				local CH = gg.multiChoice(fileList,nil,"Select files to be removed")
+				local CH = gg.multiChoice(fileList,nil,"Select files to be extracted")
 				if CH then
 					for i=1,#fileList do
 						if CH[i] then
-							tar.remove(opts.tarFile,fileList[i])
+							io.open(opts.tarPath..'/'..fileList[i]:gsub("/","_"),"wb"):write(
+								tar.extract(opts.tarFile,fileList[i])
+							):close()
 						end
 					end
 				end
@@ -172,11 +176,40 @@ while true do
 			"file",
 		})
 		if CH and CH[1] then
-			local fileList = tar.query(CH[1])
+			opts.tarFile = CH[1]
+			local fileList = {
+				table.unpack(tar.queryFolder(CH[1])),
+				table.unpack(tar.queryFile(CH[1]))
+			}
+			if fileList[1] then
+				local CH = gg.multiChoice(fileList,nil,"Select files to be removed")
+				if CH then
+					for i=1,#fileList do
+						if CH[i] then
+							tar.remove(opts.tarFile,fileList[i])
+						end
+					end
+				end
+			else
+				gg.toast("Unknown error")
+			end
+		end
+	elseif CH == 5 then
+		CH = gg.prompt({
+			"Name of Tar archive",
+		},{
+			opts.tarPath..'/'..opts.tarName,
+		},{
+			"file",
+		})
+		if CH and CH[1] then
+			local fileList = tar.queryFolder(CH[1])
+			for i=1,#fileList do print(i,fileList[i]) end
+			local fileList = tar.queryFile(CH[1])
 			for i=1,#fileList do print(i,fileList[i]) end
 			break
 		end
-	elseif CH == 5 then
+	elseif CH == 6 then
 		CH = gg.prompt({
 			"Name of Tar archive",
 		},{
@@ -188,10 +221,10 @@ while true do
 			print(table.tostring(tar.parseHeader(CH[1])))
 			break
 		end
-	elseif CH == 6 then
+	elseif CH == 7 then
 		runTests()
 		break
-	elseif CH == 7 then
+	elseif CH == 8 then
 		break
 	end
 end

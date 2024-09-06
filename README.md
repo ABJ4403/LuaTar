@@ -1,5 +1,12 @@
 # LuaTar
-This allows you to modify Tape Archive (Tar)
+![Version 3](https://img.shields.io/badge/Version-3-brightgreen?style=for-the-badge)
+[![Report issues here](https://img.shields.io/badge/Report%20issues%20here-brightgreen?style=for-the-badge)](https://github.com/ABJ4403/LuaTar/issues/new)
+[![Telegram support group](https://img.shields.io/badge/Telegram%20support%20group-brightgreen?style=for-the-badge)](https://t.me/+jCgcRExlrzExZDc1)
+
+This script allows you to modify Tape Archive (Tar)
+with just pure Lua, no external command, no LuaRocks bloat required,
+lightweight & small, and even has gameguardian wrapper script
+for gameguardian users that also wants to use this
 
 # Add the luaTar code to your script
 Just append the luaTar codes to your script, put `load("luaTar.lua")` (or if you want you can also use `load(gg.makeRequest("https://github.com/ABJ4403/luaTar/raw/main/luaTar.lua?raw=true").content)` although this one isn't recommended)
@@ -9,6 +16,9 @@ Just append the luaTar codes to your script, put `load("luaTar.lua")` (or if you
 -- Add
 tar.add("archive.tar","a.txt","Alpha")
 tar.add("archive.tar","b.txt","Bravo")
+
+-- Add folder (partial TODO)
+tar.add("archive.tar","folder/")
 
 -- Remove
 tar.remove("archive.tar","b.txt")
@@ -20,8 +30,8 @@ for i=1,#fileList do print(fileList[i]) end
 -- Extract
 tar.extract("archive.tar","a.txt")
 
--- Header checksum integrity (Experimental, likely returns false even if its not corrupted)
-tar.checkHeader("archive.tar")
+-- Parse header
+tar.parseHeader("archive.tar")
 ```
 
 # Why did i make this?

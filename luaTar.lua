@@ -7,11 +7,13 @@
 
 ]]
 local tar = {
-  VERSION = 3
+	VERSION = 4
 }
 function tar.add(tarPath,fileName,content)
 	local tarFile,err = io.open(tarPath,"ab")
 	if not tarFile then return err or false end
+	content = content or ""
+	local isFolder = content == "" and fileName:sub(#fileName,#fileName) == "/"
 	-- note: %07o = octal
 	local header =
 		fileName..("\0"):rep(100 - #fileName)..	-- Name
@@ -21,7 +23,7 @@ function tar.add(tarPath,fileName,content)
 		("%011o"):format(#content)..'\0'..			-- Size
 		("%011o"):format(0)..'\0'..							-- Last modified
 		("\0"):rep(7)..' '..										-- Checksum
-		"0"..													 					-- Type (0/1/2:file/hardlink/symlink)
+		(isFolder and "5" or "0")..							-- Type (0/1/2:file/hardlink/symlink)
 		("\0"):rep(100)..												-- linked file name (we dont want those symlinks and stuf so aint using one
 		("\0"):rep(88)..												-- UnixStandardTar header (6b) + version (2b), user + group (64b), device major + minor number (16b)
 		("\0"):rep(167)					 								-- UStar Filename prefix
@@ -44,46 +46,45 @@ function tar.add(tarPath,fileName,content)
 end
 function tar.extract(tarPath,fileName)
 	local file = io.open(tarPath,"rb")
-  if not file then return end
+	if not file then return end
 	while true do
 		local block = file:read(512) -- read every block
 		if not block then break end
 		local fileSize = tonumber(block:sub(125,135),8) -- get the file size
-if not fileSize then print("FILE SIZE CONVERSION BUG DETECTED",block:sub(125,135),1)break end
-    -- skip to next block where another file header is located
+		if not fileSize then print("Found a block with likely empty file size bytes, break.")break end
 		if block:sub(1,math.min(100,#fileName)) == fileName then -- if a block starts with filename
 			local data = file:read(fileSize) -- read the whole thing
 			file:close()
 			return data
 		end
-    local skipBlk = math.ceil((fileSize-.00000000000000001) / 512) -- extra zeroes to fix Lua floating point integer bug
-    file:seek("cur",skipBlk * 512)
+		local skipBlk = math.ceil((fileSize-.00000000000000001) / 512) -- extra zeroes to fix Lua floating point integer bug
+		file:seek("cur",skipBlk * 512)
 	end
 	file:close()
 end
 function tar.remove(tarPath,fileName)
-  local file = io.open(tarPath,"rb")
-  if not file then return end
-  local removedFiles = 0
-  local output = io.open(tarPath..".tmp","wb")
-  while true do
-    local block = file:read(512)
-    if not block then break end
-    if block:sub(1,math.min(100,#fileName)) == fileName then -- ignores the block with the file that is going to be removed
-      local fileSize = tonumber(block:sub(125,135),8)
-if not fileSize then print("FILE SIZE CONVERSION BUG DETECTED",block:sub(125,135),1)break end
-      local skipBlk = math.ceil((fileSize-.00000000000000001) / 512) -- extra zeroes to fix Lua floating point integer bug
-      file:seek("cur",skipBlk * 512)
-      removedFiles = removedFiles + 1
-    else
-      output:write(block) -- write the rest of the block to temporary file
-    end
-  end
-  file:close()
-  output:close()
-  os.remove(tarPath)
-  os.rename(tarPath..".tmp",tarPath)
-  return removedFiles
+	local file = io.open(tarPath,"rb")
+	if not file then return end
+	local removedFiles = 0
+	local output = io.open(tarPath..".tmp","wb")
+	while true do
+		local block = file:read(512)
+		if not block then break end
+		if block:sub(1,math.min(100,#fileName)) == fileName then -- ignores the block with the file that is going to be removed
+			local fileSize = tonumber(block:sub(125,135),8)
+			if not fileSize then print("Found a block with likely empty file size bytes, break.")break end
+			local skipBlk = math.ceil((fileSize-.00000000000000001) / 512) -- extra zeroes to fix Lua floating point integer bug
+			file:seek("cur",skipBlk * 512)
+			removedFiles = removedFiles + 1
+		else
+			output:write(block) -- write the rest of the block to temporary file
+		end
+	end
+	file:close()
+	output:close()
+	os.remove(tarPath)
+	os.rename(tarPath..".tmp",tarPath)
+	return removedFiles
 end
 function tar.parseHeader(tarPath)
 	local ret = {}
@@ -94,6 +95,7 @@ function tar.parseHeader(tarPath)
 		local block = file:read(512)
 		if not block then break end
 		local fileName = block:sub(1,100):gsub("\0+$","")
+		if fileName == "" then print("Found a block with empty filename, likely empty header, break.")break end
 	--checksum verify
 		local sum = 224
 		local checksum = tonumber(block:sub(149,154),8)
@@ -129,20 +131,13 @@ function tar.parseHeader(tarPath)
 		}
 		ret[fileName] = header
 	--seek block
-if not header.size then print("FILE SIZE BUG DETECTED! CANNOT CONTINUE!!")break end
-    local skipBlk =
-    	math.ceil((header.size-.00000000000000001) / 512) -- extra zeroes to fix Lua floating point integer bug
-    file:seek("cur",skipBlk * 512)
+		if not header.size then print("FILE SIZE BUG DETECTED! CANNOT CONTINUE!!")break end
+		local skipBlk =
+			math.ceil((header.size-.00000000000000001) / 512) -- extra zeroes to fix Lua floating point integer bug
+		file:seek("cur",skipBlk * 512)
 	end
 	file:close()
 	return ret
-end
-function tar.query(tarPath)
-	local fileList = {}
-	for k in pairs(tar.parseHeader(tarPath)) do
-		table.insert(fileList,k)
-	end
-	return fileList
 end
 function tar.queryFile(tarPath)
 	local fileList = {}

@@ -1,3 +1,8 @@
+# Important notice
+This repo is migrated to a much free place where there wont be this sentient aggressive false-flag banning robot that we all know as MicroShit ArkosGay: https://codeberg.org/ABJ4403/LuaTar
+
+extra rant: this is the last repo that i have to close down cuz i fully migrated to Codeberg. i know everyone, i fricking know, but the sad reality is you can never be private, secure, and anonymous at the same time, and so does ArkoseLabs with their shitty robot ranking system that thinks my browser/ip is abusive, just because i used firefox on linux with privacy tools doesnt mean i cant use github, but what do you know my friend? its microsoft, ofc they can do anything they ever wanted :(
+
 # LuaTar
 ![Version 3](https://img.shields.io/badge/Version-3-brightgreen?style=for-the-badge)
 [![Report issues here](https://img.shields.io/badge/Report%20issues%20here-brightgreen?style=for-the-badge)](https://github.com/ABJ4403/LuaTar/issues/new)
